@@ -1,29 +1,31 @@
-
 import { createBrowserRouter } from 'react-router-dom'
 
 import { Home } from './pages/home'
 import { Detail } from './pages/detail'
 import { Notfound } from './pages/notfound'
-import { Layout } from "./components/layout"
+import { Layout } from './components/layout'
 
+/**
+ * Configuração de rotas da aplicação
+ */
 const router = createBrowserRouter([
   {
-    element: <Layout/>,
+    element: <Layout />,
     children: [
       {
-        path: "/",
-        element: <Home/>
+        path: '/',
+        element: <Home />,
       },
       {
-        path: "/detail/:cripto",
-        element: <Detail/>
+        path: '/detail/:cripto',
+        element: <Detail />,
       },
       {
-        path: "*",
-        element: <Notfound/>
-      }
-    ]
-  }
+        path: '*',
+        element: <Notfound />,
+      },
+    ],
+  },
 ])
 
 export { router } 

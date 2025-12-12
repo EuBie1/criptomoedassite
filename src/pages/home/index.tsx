@@ -1,91 +1,83 @@
-import { useState, useEffect } from 'react';
-import type { FormEvent } from 'react';
+import { useState, useEffect } from 'react'
+import type { FormEvent } from 'react'
 import styles from './home.module.css'
-import { BsSearch } from  'react-icons/bs'
+import { BsSearch } from 'react-icons/bs'
 import { Link, useNavigate } from 'react-router-dom'
+import type { CoinProps, CoinApiResponse } from '../../types/coin'
+import { fetchCoins } from '../../utils/api'
+import { formatCurrency, formatCompactCurrency } from '../../utils/formatters'
 
-export interface CoinProps{
-  id: string;
-  name: string;
-  symbol: string;
-  priceUsd: string;
-  vwap24Hr: string;
-  changePercent24Hr: string;
-  rank: string;
-  supply: string;
-  maxSupply: string;
-  marketCapUsd: string;
-  volumeUsd24Hr:string;
-  explorer: string;
-  formatedPrice?: string;
-  formatedMarket?: string;
-  formatedVolume?: string;
-}
-
-interface DataProp{
-  data: CoinProps[]
-}
-
+/**
+ * Componente Home
+ * Página principal que exibe lista de criptomoedas e busca
+ */
 export function Home() {
-  const [input, setInput] = useState("")
-  const [coins, setCoins] = useState<CoinProps[]>([]);
-  const [offset, setOffset] = useState(0);
+  const [input, setInput] = useState('')
+  const [coins, setCoins] = useState<CoinProps[]>([])
+  const [offset, setOffset] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  const navigate = useNavigate();
+  const navigate = useNavigate()
 
   useEffect(() => {
-    getData();
+    getData()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [offset])
 
-  async function getData(){
-   fetch(`https://rest.coincap.io/v3/assets?limit=10&offset=${offset}&apiKey=4093eb869547906dbb66fa4c0e36b7373f68283a67f8f56e448934e714dd5b08`)
-    .then(response => response.json())
-    .then((data: DataProp) => {
-      const coinsData = data.data;
+  /**
+   * Busca dados das criptomoedas da API
+   */
+  async function getData() {
+    setLoading(true)
+    try {
+      const data: CoinApiResponse = await fetchCoins(10, offset)
+      const coinsData = data.data
 
-      const price = Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD"
-      })
+      if (!coinsData || coinsData.length === 0) {
+        console.warn('Nenhuma criptomoeda retornada da API')
+        return
+      }
 
-      const priceCompact = Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: "USD",
-        notation: "compact"
-      })
+      // Formatação de valores monetários
+      const formatedResult = coinsData.map((item) => ({
+        ...item,
+        formatedPrice: formatCurrency(Number(item.priceUsd)),
+        formatedMarket: formatCompactCurrency(Number(item.marketCapUsd)),
+        formatedVolume: formatCompactCurrency(Number(item.volumeUsd24Hr)),
+      }))
 
-      const formatedResult = coinsData.map((item) => {
-        const formated = {
-          ...item,
-          formatedPrice: price.format(Number(item.priceUsd)),
-          formatedMarket: priceCompact.format(Number(item.marketCapUsd)),
-          formatedVolume: priceCompact.format(Number(item.volumeUsd24Hr))
-        }
-
-        return formated;
-      })
-
-      //console.log(formatedResult);
-
-      const listCoins = [...coins, ...formatedResult]
-      setCoins(listCoins);
-
-    })
-
+      // Se for o primeiro carregamento (offset === 0), substitui o array
+      // Se for carregar mais, adiciona ao array existente
+      if (offset === 0) {
+        setCoins(formatedResult)
+      } else {
+        setCoins((prevCoins) => [...prevCoins, ...formatedResult])
+      }
+    } catch (error) {
+      console.error('Erro ao buscar dados:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function handleSubmit(e: FormEvent){
-    e.preventDefault();
+  /**
+   * Handle do formulário de busca
+   */
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
 
-    if(input === "") return;
+    if (input.trim() === '') return
 
-    navigate(`/detail/${input}`)
+    navigate(`/detail/${input.trim().toLowerCase()}`)
   }
 
-  function handleGetMore(){
-    if(offset === 0){
+  /**
+   * Carrega mais criptomoedas
+   */
+  function handleGetMore() {
+    if (offset === 0) {
       setOffset(10)
-      return;
+      return
     }
 
     setOffset(offset + 10)
@@ -93,75 +85,109 @@ export function Home() {
 
   return (
     <main className={styles.container}>
-      <form className={styles.form} onSubmit={handleSubmit}>
-        <input 
-          type="text"
-          placeholder="Digite o nome da moeda... EX bitcoin"
-          value={input}
-          onChange={ (e) => setInput(e.target.value) }
-        />
-        <button type="submit">
-          <BsSearch size={30} color="#FFF" />
-        </button>
-      </form>
+      {/* Hero Section - Formulário de busca */}
+      <section className={styles.hero}>
+        <h1 className={styles.heroTitle}>Explore Criptomoedas</h1>
+        <p className={styles.heroSubtitle}>
+          Busque informações sobre qualquer criptomoeda
+        </p>
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <input
+            type="text"
+            placeholder="Digite o nome da moeda... Ex: bitcoin"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            className={styles.input}
+            aria-label="Buscar criptomoeda"
+          />
+          <button type="submit" className={styles.searchButton} aria-label="Buscar">
+            <BsSearch size={24} color="#FFF" />
+          </button>
+        </form>
+      </section>
 
+      {/* Tabela de criptomoedas */}
+      <section className={styles.tableSection}>
+        {loading && coins.length === 0 ? (
+          <div className={styles.emptyState}>
+            <div className={styles.spinner}></div>
+            <p>Carregando criptomoedas...</p>
+          </div>
+        ) : coins.length > 0 ? (
+          <>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th scope="col">Moeda</th>
+                  <th scope="col">Valor mercado</th>
+                  <th scope="col">Preço</th>
+                  <th scope="col">Volume</th>
+                  <th scope="col">Mudança 24h</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coins.map((item) => (
+                  <tr className={styles.tr} key={item.id}>
+                    <td className={styles.tdLabel} data-label="Moeda">
+                      <div className={styles.name}>
+                        <img
+                          className={styles.logo}
+                          alt={`Logo ${item.name}`}
+                          src={`https://assets.coincap.io/assets/icons/${item.symbol.toLowerCase()}@2x.png`}
+                          loading="lazy"
+                        />
+                        <Link to={`/detail/${item.id}`} className={styles.coinLink}>
+                          <span className={styles.coinName}>{item.name}</span>
+                          <span className={styles.coinSymbol}> | {item.symbol}</span>
+                        </Link>
+                      </div>
+                    </td>
 
-      <table>
-        <thead>
-          <tr>
-            <th scope="col">Moeda</th>
-            <th scope="col">Valor mercado</th>
-            <th scope="col">Preço</th>
-            <th scope="col">Volume</th>
-            <th scope="col">Mudança 24h</th>
-          </tr>
-        </thead>
+                    <td className={styles.tdLabel} data-label="Valor mercado">
+                      {item.formatedMarket}
+                    </td>
 
-        <tbody id="tbody">
+                    <td className={styles.tdLabel} data-label="Preço">
+                      {item.formatedPrice}
+                    </td>
 
-          {coins.length > 0 && coins.map((item) => (
-            <tr className={styles.tr} key={item.id}>
+                    <td className={styles.tdLabel} data-label="Volume">
+                      {item.formatedVolume}
+                    </td>
 
-              <td className={styles.tdLabel} data-label="Moeda">
-                <div className={styles.name}>
-                  <img
-                    className={styles.logo}
-                    alt="Logo Cripto"
-                    src={`https://assets.coincap.io/assets/icons/${item.symbol.toLowerCase()}@2x.png`}
-                  />
-                  
-                  <Link to={`/detail/${item.id}`}>
-                    <span>{item.name}</span> | {item.symbol}
-                  </Link>
-                </div>
-              </td>
-  
-              <td className={styles.tdLabel} data-label="Valor mercado">
-                {item.formatedMarket}
-              </td>
-  
-              <td className={styles.tdLabel} data-label="Preço">
-                {item.formatedPrice}
-              </td>
-  
-              <td className={styles.tdLabel} data-label="Volume">
-                {item.formatedVolume}
-              </td>
-  
-              <td className={Number(item.changePercent24Hr) > 0 ? styles.tdProfit : styles.tdLoss} data-label="Mudança 24h">
-                <span>{Number(item.changePercent24Hr).toFixed(3)}</span>
-              </td>
-  
-            </tr>
-          ))}
+                    <td
+                      className={
+                        Number(item.changePercent24Hr) > 0
+                          ? styles.tdProfit
+                          : styles.tdLoss
+                      }
+                      data-label="Mudança 24h"
+                    >
+                      <span>
+                        {Number(item.changePercent24Hr) > 0 ? '+' : ''}
+                        {Number(item.changePercent24Hr).toFixed(2)}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-        </tbody>
-      </table>
-
-      <button className={styles.buttonMore} onClick={handleGetMore}>
-        Carregar mais
-      </button>
-
+            <button
+              className={styles.buttonMore}
+              onClick={handleGetMore}
+              disabled={loading}
+              aria-label="Carregar mais criptomoedas"
+            >
+              {loading ? 'Carregando...' : 'Carregar mais'}
+            </button>
+          </>
+        ) : (
+          <div className={styles.emptyState}>
+            <p>Nenhuma criptomoeda encontrada.</p>
+          </div>
+        )}
+      </section>
     </main>
   )
 }

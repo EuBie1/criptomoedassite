@@ -1,12 +1,15 @@
-
 import { Header } from '../header'
 import { Outlet } from 'react-router-dom'
 
-export function Layout(){
-  return(
+/**
+ * Componente Layout
+ * Wrapper principal que contém o Header e renderiza as rotas filhas
+ */
+export function Layout() {
+  return (
     <>
-      <Header/>
-      <Outlet/>
+      <Header />
+      <Outlet />
     </>
   )
 }
